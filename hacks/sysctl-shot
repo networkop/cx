@@ -1,0 +1,11 @@
+[Unit]
+Description=sysctl workaround
+After=network.target 
+
+[Service]
+Type=oneshot
+ExecStart=sysctl --system
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

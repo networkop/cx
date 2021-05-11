@@ -1,0 +1,13 @@
+[Unit]
+Description=mstpd workaround
+After=network.target mstpd.service
+ConditionKernelVersion=!4.19.0-cl-1-amd64
+
+[Service]
+Type=oneshot
+ExecStartPre=ip link add bridge type bridge 
+ExecStart=/sbin/mstpctl addbridge bridge 
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
