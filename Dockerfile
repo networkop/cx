@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils
+RUN apt update && apt install -y vim systemd udev pciutils sudo
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -75,10 +75,6 @@ RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/pytho
 # this is needed to get `net show configuration commands` working
 RUN touch /etc/cumulus/ports.conf
 
-# For some reason default version of bridge does not recognise `peerlink` option
-#RUN apt install -y iproute2=4.19.0-cl4.3.0u1
-#COPY hacks/bridge /sbin/bridge
-
 # Stubbing out any calls to eeprom decoders to return spoofed data instead
 COPY hacks/decode-syseeprom /usr/cumulus/bin/decode-syseeprom
 
@@ -100,9 +96,12 @@ COPY hacks/interfaces /etc/network/interfaces
 
 # Copy sysctl settings
 COPY hacks/sysctl.d/ /etc/sysct.d/
-COPY hacks/sysctl-shot /etc/systemd/system/sysctl-shot.service 
-RUN  ln -s  /etc/systemd/system/sysctl-shot.service /etc/systemd/system/multi-user.target.wants/sysctl-shot.service
+COPY hacks/systemd-sysctl.service /lib/systemd/system/systemd-sysctl.service
 
+# Pre-create resolve.conf and stop dhclient from trying to change it
+RUN echo -n "nameserver 8.8.8.8 # vrf mgmt" > /etc/resolv.conf && \
+    echo 'make_resolv_conf() { :; }' > /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone && \
+    chmod 755 /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone
 
 ## TEMP debugs, remove later
 RUN sed -i 's/\/usr\/lib\/cumulus\/pre-clagd/\/usr\/lib\/cumulus\/pre-clagd -l DEBUG/' /lib/systemd/system/clagd.service
