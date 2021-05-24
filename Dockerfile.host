@@ -1,0 +1,11 @@
+FROM debian:buster-slim
+
+RUN apt update && apt install -y openssh-server \
+    python3-apt ntp lldpd ifupdown2 python-apt iputils-ping tcpdump
+RUN mkdir /run/sshd 
+
+RUN echo "root:root" | chpasswd
+RUN sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+ENTRYPOINT ["/usr/sbin/sshd"]
+CMD ["-D"]
