@@ -10,9 +10,9 @@ RUN apt update && apt install -y vim systemd udev pciutils sudo
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
 # or apt list --installed  2>/dev/null | tail -n +2 | awk -F '/| ' '{print $1"="$3}' | grep cl > packages
-COPY data/packages packages
-COPY data/sources.list /etc/apt/sources.list
-COPY data/trusted.gpg /etc/apt/trusted.gpg
+COPY 4.4/packages packages
+COPY 4.4/sources.list /etc/apt/sources.list
+COPY 4.4/trusted.gpg /etc/apt/trusted.gpg
 
 # This is for NTP package
 RUN mkdir -p /usr/lib/systemd/system-preset/
@@ -20,12 +20,13 @@ RUN mkdir -p /usr/lib/systemd/system-preset/
 RUN apt update
 
 # Install most required packages first
-RUN apt install -y nclu switchd frr switchd iproute2=4.19.0-cl4.3.0u1 tcpdump --allow-downgrades
+RUN apt install -y nclu switchd frr switchd tcpdump --allow-downgrades
 
 # Delete unwanted packages 
 RUN  sed -i '/cumulus-docker-setup/d' packages && \
     sed -i '/docker-ce/d' packages && \
     sed -i '/docker-ce-cli/d' packages && \
+    sed -i '/what-just-happened/d' packages && \
     sed -i '/containerd.io/d' packages && \
     sed -i '/onie-tools/d' packages && \
     sed -i '/grub-common/d' packages && \
@@ -36,8 +37,15 @@ RUN  sed -i '/cumulus-docker-setup/d' packages && \
     sed -i '/netq-apps/d' packages && \
     sed -i '/openvswitch-common/d' packages && \
     sed -i '/python-openvswitch/d' packages && \
+    sed -i '/python3-nvue/d' packages && \
     sed -i '/openvswitch-vtep/d' packages
-    
+
+# TODO: add this back after ethtool is added to the repo
+RUN  sed -i '/ethtool/d' packages 
+
+# Workaround for nvue
+RUN ln -s /usr/bin/env /bin/env
+
 # Install everything else
 RUN apt install --allow-downgrades -y $(cat packages)
 
@@ -60,7 +68,7 @@ RUN  ln -s  /etc/systemd/system/mstpd-shot.service /etc/systemd/system/multi-use
 # Disabling aclinit due to 'iptables --class' non-existing
 RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/aclinit.service
 RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/acltool.service
-RUN mkdir /etc/cumulus/acl/policy.d/ && \
+RUN mkdir -p /etc/cumulus/acl/policy.d/ && \
     touch /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules 
 # This is just to have one rule otherwise net delete all fails
 RUN echo "[ebtables]" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules && \
@@ -76,7 +84,7 @@ RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/pytho
 RUN touch /etc/cumulus/ports.conf
 
 # Stubbing out any calls to eeprom decoders to return spoofed data instead
-COPY hacks/decode-syseeprom /usr/cumulus/bin/decode-syseeprom
+COPY hacks/decode-syseeprom.4.4 /usr/cumulus/bin/decode-syseeprom
 
 # Disabling switchd ffs
 RUN cp /lib/systemd/system/switchd.service /lib/systemd/system/switchd.service.bkp && \

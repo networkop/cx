@@ -1,0 +1,25 @@
+# Cumulus Linux package repository
+deb http://apt.cumulusnetworks.com/repo CumulusLinux-4.4-latest cumulus upstream netq
+deb-src http://apt.cumulusnetworks.com/repo CumulusLinux-4.4-latest cumulus upstream netq
+
+# NetQ package repository
+#
+# deb http://apps3.cumulusnetworks.com/repos/deb/ CumulusLinux-4.4 netq-latest
+
+# Debian 10 Buster main package repositories
+# Uncomment these if you want to install upstream Debian packages
+# that are not mirrored in the Cumulus Linux repositories.
+# Packages installed this way may cause problems, and are not
+# officially supported by Cumulus Networks, Inc.
+# deb http://deb.debian.org/debian buster main
+# deb http://deb.debian.org/debian buster-updates main
+# deb http://security.debian.org buster/updates main
+# deb http://deb.debian.org/debian buster-backports main
+
+# Debian 10 Buster main package source repositories
+# Only need to uncomment these if you want to install
+# upstream Debian source packages
+# deb-src http://deb.debian.org/debian buster main
+# deb-src http://deb.debian.org/debian buster-updates main
+# deb-src http://security.debian.org buster/updates main
+# deb-src http://deb.debian.org/debian buster-backports main

@@ -7,7 +7,7 @@ iface mgmt
     vrf-table auto
 
 auto eth0
-iface eth0 inet dhcp
+iface eth0  inet dhcp
     vrf mgmt
 
 source /etc/network/interfaces.d/*
