@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -19,8 +19,7 @@ RUN mkdir -p /usr/lib/systemd/system-preset/
 
 RUN apt update
 
-# Install most required packages first
-RUN apt install -y nclu switchd frr switchd tcpdump --allow-downgrades
+
 
 # Delete unwanted packages 
 RUN  sed -i '/cumulus-docker-setup/d' packages && \
@@ -40,14 +39,17 @@ RUN  sed -i '/cumulus-docker-setup/d' packages && \
     sed -i '/python3-nvue/d' packages && \
     sed -i '/openvswitch-vtep/d' packages
 
+
 # TODO: add this back after ethtool is added to the repo
 RUN  sed -i '/ethtool/d' packages 
 
-# Workaround for nvue
-RUN ln -s /usr/bin/env /bin/env
-
 # Install everything else
 RUN apt install --allow-downgrades -y $(cat packages)
+
+# Workaround for nvue
+RUN ln -s /usr/bin/env /bin/env
+RUN apt install -y python3-nvue || sed -i '/systemctl restart/d' /var/lib/dpkg/info/python3-nvue.postinst && \
+    apt install -y python3-nvue
 
 RUN echo ". /etc/profile" >> /root/.bashrc
 
