@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -49,7 +49,8 @@ RUN apt install --allow-downgrades -y $(cat packages)
 # Workaround for nvue
 RUN ln -s /usr/bin/env /bin/env
 RUN apt install -y python3-nvue || sed -i '/systemctl restart/d' /var/lib/dpkg/info/python3-nvue.postinst && \
-    apt install -y python3-nvue
+    apt install -y python3-nvue && \
+    sed -i 's/KEY=.*/KEY=nvue/' /usr/lib/nvue/nvued-pre.sh
 
 RUN echo ". /etc/profile" >> /root/.bashrc
 
@@ -71,6 +72,7 @@ RUN  ln -s  /etc/systemd/system/mstpd-shot.service /etc/systemd/system/multi-use
 RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/aclinit.service
 RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/acltool.service
 RUN mkdir -p /etc/cumulus/acl/policy.d/ && \
+    rm -rf /etc/cumulus/acl/policy.d/* && \
     touch /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules 
 # This is just to have one rule otherwise net delete all fails
 RUN echo "[ebtables]" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules && \
