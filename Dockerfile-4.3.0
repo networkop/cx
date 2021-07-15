@@ -103,4 +103,7 @@ RUN echo -n "nameserver 8.8.8.8 # vrf mgmt" > /etc/resolv.conf && \
     echo 'make_resolv_conf() { :; }' > /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone && \
     chmod 755 /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone
 
+# Ensure FRR always starts
+RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.wants/frr.service
+
 ENTRYPOINT ["/sbin/init"]

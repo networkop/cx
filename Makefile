@@ -1,6 +1,6 @@
 REGISTRY := docker.io/networkop
 IMAGE := cx
-TAG := 4.4.0
+TAG ?= 4.4.0
 HOST_IMAGE := host:ifreload
 
 all: help 

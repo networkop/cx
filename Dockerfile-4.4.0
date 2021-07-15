@@ -119,4 +119,8 @@ RUN echo -n "nameserver 8.8.8.8 # vrf mgmt" > /etc/resolv.conf && \
 RUN sed -i 's/\/usr\/lib\/cumulus\/pre-clagd/\/usr\/lib\/cumulus\/pre-clagd -l DEBUG/' /lib/systemd/system/clagd.service
 RUN sed -i 's/\/usr\/bin\/neighmgrd/\/usr\/bin\/neighmgrd -l DEBUG/' /lib/systemd/system/neighmgrd.service
 
+# Ensure FRR always starts
+RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.wants/frr.service
+
+
 ENTRYPOINT ["/sbin/init"]
