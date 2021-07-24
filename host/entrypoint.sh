@@ -3,8 +3,9 @@
 INTFS=${CLAB_INTFS:-0}
 
 # next check if the argument was provided which can override the above
-INTFS=${1:INTFS}
+INTFS=${1:-$INTFS}
 
+echo "Waiting for $INTFS interfaces to be connected"
 int_calc () 
 {
     index=0
@@ -16,7 +17,6 @@ int_calc ()
 
 int_calc
 
-echo "Waiting for $INTFS interfaces to be connected"
 while [ "$MYINT" -lt "$INTFS" ]; do
   echo "Connected $MYINT interfaces out of $INTFS"
   sleep 1
