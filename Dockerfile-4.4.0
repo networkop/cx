@@ -122,5 +122,7 @@ RUN sed -i 's/\/usr\/bin\/neighmgrd/\/usr\/bin\/neighmgrd -l DEBUG/' /lib/system
 # Ensure FRR always starts
 RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.wants/frr.service
 
+# Disable smond
+RUN rm /etc/systemd/system/multi-user.target.wants/smond.service
 
 ENTRYPOINT ["/sbin/init"]

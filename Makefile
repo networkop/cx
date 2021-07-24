@@ -2,6 +2,7 @@ REGISTRY := docker.io/networkop
 IMAGE := cx
 TAG ?= 4.4.0
 HOST_IMAGE := host:ifreload
+HOST_SUFFIX ?= $(shell git rev-parse --short HEAD)
 
 all: help 
 
@@ -13,7 +14,8 @@ build:
 .PHONY: host
 ## Build the host image
 host:
-	cd host && docker build -t $(REGISTRY)/$(HOST_IMAGE) .
+	cd host && docker build -t $(REGISTRY)/$(HOST_IMAGE)-$(HOST_SUFFIX) .
+	docker tag $(REGISTRY)/$(HOST_IMAGE)-$(HOST_SUFFIX)  $(REGISTRY)/$(HOST_IMAGE)
 
 
 .PHONY: run
