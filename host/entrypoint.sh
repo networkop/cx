@@ -1,9 +1,9 @@
 #!/bin/bash
-# first check the first argument, defaulting to 0
-INTFS=${1:-0}
+# first check if CLAB_INTFS is configured (containerlab's metadata var), defaulting to 0
+INTFS=${CLAB_INTFS:-0}
 
-# next check if the CLAB_INTFS is configured (containerlab's metadata var)
-INTFS=${CLAB_INTFS:INTFS}
+# next check if the argument was provided which can override the above
+INTFS=${1:INTFS}
 
 int_calc () 
 {
