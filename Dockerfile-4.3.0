@@ -95,7 +95,7 @@ RUN echo "root:root" | chpasswd && \
 COPY hacks/interfaces /etc/network/interfaces
 
 # Copy sysctl settings
-COPY hacks/sysctl.d/ /etc/sysct.d/
+COPY hacks/sysctl.d/ /etc/sysctl.d/
 COPY hacks/systemd-sysctl.service /lib/systemd/system/systemd-sysctl.service
 
 # Pre-create resolve.conf and stop dhclient from trying to change it
