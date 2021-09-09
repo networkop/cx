@@ -9,7 +9,7 @@ This is a containerised Cumulus VX image.
 To build the latest stable CL version run: 
 
 ```
-docker build -t networkop/cx:4.4.0 -f Dockerfile-4.4.0 .
+make build
 ```
 
 To build an older version of CL, e.g. 4.3.0 run:

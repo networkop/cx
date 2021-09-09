@@ -1,0 +1,9 @@
+# Cumulus Linux package repository
+deb http://repo3.cumulusnetworks.com/repo CumulusLinux-3 cumulus upstream
+deb-src http://repo3.cumulusnetworks.com/repo CumulusLinux-3 cumulus upstream
+
+deb http://repo3.cumulusnetworks.com/repo CumulusLinux-3-security-updates cumulus upstream
+deb-src http://repo3.cumulusnetworks.com/repo CumulusLinux-3-security-updates cumulus upstream
+
+deb http://repo3.cumulusnetworks.com/repo CumulusLinux-3-updates cumulus upstream
+deb-src http://repo3.cumulusnetworks.com/repo CumulusLinux-3-updates cumulus upstream
