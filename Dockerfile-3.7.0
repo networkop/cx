@@ -57,8 +57,8 @@ COPY hacks/mstpd-shot /etc/systemd/system/mstpd-shot.service
 RUN  ln -s  /etc/systemd/system/mstpd-shot.service /etc/systemd/system/multi-user.target.wants/mstpd-shot.service
 
 # Disabling aclinit due to 'iptables --class' non-existing
-RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/aclinit.service
-RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/acltool.service
+RUN sed -i 's/ExecStart=.*/ExecStart=\/bin\/true/' /lib/systemd/system/aclinit.service
+RUN sed -i 's/ExecStart=.*/ExecStart=\/bin\/true/' /lib/systemd/system/acltool.service
 RUN mkdir /etc/cumulus/acl/policy.d/ && \
     touch /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules
 # This is just to have one rule otherwise net delete all fails
@@ -66,7 +66,7 @@ RUN echo "[ebtables]" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rul
     echo "-A INPUT -p ipv4 --in-interface swp+ -j ACCEPT" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules
 
 # Stubbing out ledmgrd to avoid polluting logs
-RUN sed -i 's/ExecStart=.*/ExecStart=tail -f \/dev\/null/' /lib/systemd/system/ledmgrd.service
+RUN sed -i 's/ExecStart=.*/ExecStart=\/usr\/bin\/tail -f \/dev\/null/' /lib/systemd/system/ledmgrd.service
 
 # Hardcoding platform to cumulux_vx
 RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/python2.7/dist-packages/cumulus/platforms/__init__.py
@@ -79,7 +79,7 @@ COPY hacks/decode-syseeprom /usr/cumulus/bin/decode-syseeprom
 
 # Disabling switchd ffs
 RUN cp /lib/systemd/system/switchd.service /lib/systemd/system/switchd.service.bkp && \
-    sed -i 's/ExecStart=.*/ExecStart=tail -f \/dev\/null/' /lib/systemd/system/switchd.service && \
+    sed -i 's/ExecStart=.*/ExecStart=\/usr\/bin\/tail -f \/dev\/null/' /lib/systemd/system/switchd.service && \
     sed -i 's/Type=notify/Type=simple/' /lib/systemd/system/switchd.service && \
     sed -i '/ExecReload=.*/d' /lib/systemd/system/switchd.service && \
     sed -i '/ExecStopPost=.*/d' /lib/systemd/system/switchd.service && \

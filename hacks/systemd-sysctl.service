@@ -19,7 +19,7 @@ ConditionPathIsReadWrite=/proc/sys/net/
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=ip link add foo type bridge 
+ExecStartPre=/sbin/ip link add foo type bridge
 ExecStart=/lib/systemd/systemd-sysctl
-ExecStartPost=ip link del foo
+ExecStartPost=/sbin/ip link del foo
 TimeoutSec=90s
