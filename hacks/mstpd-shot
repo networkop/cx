@@ -5,7 +5,7 @@ ConditionKernelVersion=!4.19.0-cl-1-amd64
 
 [Service]
 Type=oneshot
-ExecStartPre=ip link add bridge type bridge 
+ExecStartPre=/sbin/ip link add bridge type bridge
 ExecStart=/sbin/mstpctl addbridge bridge 
 RemainAfterExit=true
 
