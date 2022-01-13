@@ -1,6 +1,6 @@
 REGISTRY := docker.io/networkop
 IMAGE := cx
-TAG ?= 4.4.0
+TAG ?= 5.0.0
 HOST_IMAGE := host:ifreload
 HOST_SUFFIX ?= $(shell git rev-parse --short HEAD)
 
@@ -21,7 +21,7 @@ host:
 .PHONY: run
 ## Run the Cumulus VX image
 run:
-	docker run -d --name cumulus --privileged $(REGISTRY)/$(IMAGE):$(TAG)
+	docker run -d --name cumulus --privileged -p 8765:8765 $(REGISTRY)/$(IMAGE):$(TAG)
 
 
 # From: https://gist.github.com/klmr/575726c7e05d8780505a
