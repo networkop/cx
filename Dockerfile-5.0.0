@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -119,6 +119,12 @@ RUN echo -n "nameserver 8.8.8.8 # vrf mgmt" > /etc/resolv.conf && \
     echo 'make_resolv_conf() { :; }' > /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone && \
     chmod 755 /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone
 
+# Reduce dhclient timeout to avoid long startups 
+RUN sed -i 's/#timeout 60;/timeout 2;/' /etc/dhcp/dhclient.conf
+
+# Hack hard-coded file paths
+RUN ln -s /sbin/ifreload /usr/sbin/ifreload && \
+    ln -s /bin/lsblk /usr/bin/lsblk
 
 # Ensure FRR always starts
 RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.wants/frr.service
