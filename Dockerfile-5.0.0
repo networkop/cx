@@ -132,4 +132,8 @@ RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.
 # Disable smond
 RUN rm /etc/systemd/system/multi-user.target.wants/smond.service
 
+# Install PCAP-capable hsflowd
+COPY hacks/hsflowd_2.0.36-2_amd64.deb /tmp 
+RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
+
 ENTRYPOINT ["/sbin/init"]
