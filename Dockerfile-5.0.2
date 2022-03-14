@@ -135,12 +135,16 @@ COPY hacks/hsflowd_2.0.36-2_amd64.deb /tmp
 RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
 
 # netq-agent (prepare)
-COPY 5.0/netq.list /etc/apt/sources.list.d/netq.list
-COPY 5.0/netq.key /tmp/netq.key
-COPY 5.0/os-release /etc/os-release
+COPY 5.0/netq/netq.list /etc/apt/sources.list.d/netq.list
+COPY 5.0/netq/netq.key /tmp/netq.key
+COPY 5.0/netq/os-release /etc/os-release
+
 RUN apt-key add /tmp/netq.key
 
 # netq-agent (install)
 RUN apt install netq-agent -y
+
+# netq-agent (configure)
+COPY 5.0/netq/netq.yml /etc/netq/netq.yml
 
 ENTRYPOINT ["/sbin/init"]

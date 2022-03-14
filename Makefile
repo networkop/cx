@@ -1,6 +1,6 @@
 REGISTRY := docker.io/networkop
 IMAGE := cx
-TAG ?= 5.0.2-netq
+TAG ?= 5.0.2
 HOST_IMAGE := host:ifreload
 HOST_SUFFIX ?= $(shell git rev-parse --short HEAD)
 

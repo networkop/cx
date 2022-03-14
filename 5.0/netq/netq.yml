@@ -1,0 +1,6 @@
+netq-agent:
+  is-gnmi-enabled: true
+  is-opta-enabled: false
+  vrf: mgmt
+netq-gnmi:
+  gnmi_port: 9339
