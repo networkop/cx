@@ -137,14 +137,15 @@ RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
 # netq-agent (prepare)
 COPY 5.0/netq/netq.list /etc/apt/sources.list.d/netq.list
 COPY 5.0/netq/netq.key /tmp/netq.key
-COPY 5.0/netq/os-release /etc/os-release
+COPY 5.0/netq/sonic_version.yml /etc/sonic/sonic_version.yml
 
 RUN apt-key add /tmp/netq.key
 
 # netq-agent (install)
-RUN apt install netq-agent -y
+RUN apt update && apt install netq-agent -y
 
 # netq-agent (configure)
 COPY 5.0/netq/netq.yml /etc/netq/netq.yml
+COPY 5.0/netq/cl4-netq-commands.yml /etc/netq/commands/cl4-netq-commands.yml
 
 ENTRYPOINT ["/sbin/init"]

@@ -1,1 +1,1 @@
-deb https://apps3.cumulusnetworks.com/repos/deb CumulusLinux-4 netq-4.1
+deb [arch=amd64] https://apps3.cumulusnetworks.com/repos/deb buster netq-latest
