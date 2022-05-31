@@ -137,7 +137,7 @@ RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
 # netq-agent (prepare)
 COPY 5.0/netq/netq.list /etc/apt/sources.list.d/netq.list
 COPY 5.0/netq/netq.key /tmp/netq.key
-COPY 5.0/netq/os-release /etc/os-release
+#COPY 5.0/netq/os-release /etc/os-release
 
 RUN apt-key add /tmp/netq.key
 
@@ -147,5 +147,8 @@ RUN apt update && apt install netq-agent -y
 # netq-agent (configure)
 COPY 5.0/netq/netq.yml /etc/netq/netq.yml
 RUN sed -i 's/swp/veth/' /usr/share/venvs/netq-agent/lib/python3.7/site-packages/netq_lib/common/enums.py
+
+# Ensure netqd always starts
+RUN ln -s /lib/systemd/system/netq-agent.service /etc/systemd/system/multi-user.target.wants/netq-agent.service
 
 ENTRYPOINT ["/sbin/init"]
