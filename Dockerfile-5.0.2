@@ -144,6 +144,10 @@ RUN apt-key add /tmp/netq.key
 # netq-agent (install)
 RUN apt update && apt install netq-agent -y
 
+# Reduce the net-dev polling interval to 7 seconds
+COPY 5.0/netq/cl4-netq-commands.yml /etc/netq/commands/cl4-netq-commands.yml
+RUN sed -i 's/_MIN_PERIOD = 15/_MIN_PERIOD = 7/' /usr/share/venvs/netq-agent/lib/python3.7/site-packages/netq_agent/cmd/agent.py
+
 # netq-agent (configure)
 COPY 5.0/netq/netq.yml /etc/netq/netq.yml
 RUN sed -i 's/swp/veth/' /usr/share/venvs/netq-agent/lib/python3.7/site-packages/netq_lib/common/enums.py

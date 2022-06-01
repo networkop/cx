@@ -1,0 +1,183 @@
+netq-commands:
+  - service: 'bgpd'
+    commands:
+      - period: "60"
+        key: "bgp-neighbors"
+        parser: "local"
+        command: ["/usr/bin/vtysh", "-c","show ip bgp vrf all neighbors json"]
+        isactive: true
+      - period: "60"
+        key: "evpn-vni"
+        parser: "local"
+        command: ["/usr/bin/vtysh", "-c","show bgp l2vpn evpn vni json"]
+        isactive: true
+  - service: "lldpd"
+    commands:
+      - period: "120"
+        key: "lldp-json"
+        command: "/usr/sbin/lldpctl -f json"
+        isactive: true
+        parser: "local"
+  - service: "clagd"
+    commands:
+      - period: "60"
+        key: "clagctl-json"
+        command: "/usr/bin/clagctl -j"
+        isactive: true
+        parser: "local"
+  - service: "dpkg"
+    commands:
+      - period: "21600"
+        key: "dpkg-query"
+        command: "dpkg-query --show -f ${Package},${Version},${Status}\\n"
+        isactive: true
+        parser: "local"
+  - service: "ptmctl"
+    commands:
+      - period: "120"
+        key: "ptmctl-json"
+        command: "/usr/bin/ptmctl -d -j"
+        isactive: true
+        parser: "local"
+  - service: "mstpd"
+    commands:
+      - period: "60"
+        key: "mstpctl-bridge-json"
+        command: "/sbin/mstpctl showall json"
+        isactive: true
+        parser: "local"
+  - service: "misc"
+    commands:
+      - period: "3600"
+        key: "ports"
+        command: None
+        isactive: true
+        parser: "local"
+      - period: "7"
+        key: "proc-net-dev"
+        isactive: true
+        command: None
+        parser: "local"
+      - period: "1800"
+        key: "dom"
+        isactive: true
+        command: None
+        parser: "local"
+      - period: "60"
+        key: "roce"
+        isactive: true
+        command: "/usr/lib/cumulus/mlxcmd --json roce counters"
+        parser: "local"
+      - period: "30"
+        key: "roce-config"
+        isactive: true
+        command: None
+        parser: "local"
+  - service: "agentStats"
+    commands:
+      - period: "300"
+        key: "agent_stats"
+        command: None
+        isactive: true
+        parser: "local"
+      - period: "30"
+        key: "agent_util_stats"
+        command: None
+        isactive: true
+        parser: "local"
+  - service: "tcam"
+    commands:
+      - period: "120"
+        key: "tcam-resource-json"
+        command: "/usr/cumulus/bin/cl-resource-query -j"
+        isactive: true
+        parser: "local"
+  - service: "configMon"
+    commands:
+      - period: "120"
+        key: "config-mon-json"
+        command: None
+        isactive: true
+        parser: "local"
+  - service: "runningConfigMon"
+    commands:
+      - period: "30"
+        key: "running-config-mon-json"
+        command: None
+        isactive: true
+        parser: "local"
+  - service: "clSupport"
+    commands:
+      - period: "180"
+        key: "cl-support-json"
+        command: None
+        isactive: true
+        parser: "local"
+  - service: "resourceUtil"
+    commands:
+      - period: "120"
+        key: "resource-util-json"
+        command: "findmnt / -n -o FS-OPTIONS"
+        isactive: true
+        parser: "local"
+  - service: "smond"
+    commands:
+      - period: "30"
+        key: "smonctl-json"
+        command: "/usr/sbin/smonctl -j"
+        isactive: true
+        parser: "local"
+      - period: "30"
+        key: "sensors-json"
+        command: "sensors -u"
+        isactive: true
+        parser: "local"
+  - service: "ssdUtil"
+    commands:
+      - period: "86400"
+        key: "ssd-util-json"
+        command: "/usr/sbin/smartctl -a /dev/sda"
+        isactive: true
+        parser: "local"
+  - service: "ospfd"
+    commands:
+      - period: "60"
+        command: ["/usr/bin/vtysh", "-c", "show ip ospf vrf all neighbor detail json"]
+        isactive: true
+        parser: "local"
+        key: "ospf-neighbor-json"
+      - period: "60"
+        command: ["/usr/bin/vtysh", "-c",  "show ip ospf vrf all interface json"]
+        isactive: true
+        parser: "local"
+        key: "ospf-interface-json"
+  - service: "inventory"
+    commands:
+      - key: "os-release"
+        command: "cat /etc/os-release"
+        isactive: true
+        parser: "local"
+      - key: "eprom"
+        command: "/usr/cumulus/bin/decode-syseeprom -j"
+        isactive: true
+        parser: "local"
+      - key: "lscpu"
+        command: "/usr/bin/lscpu"
+        isactive: true
+        parser: "local"
+      - key: "meminfo"
+        command: "cat /proc/meminfo"
+        isactive: true
+        parser: "local"
+      - key: "lsblk"
+        command: "lsblk -d -n -o name,size,type,vendor,tran,rev,model"
+        isactive: true
+        parser: "local"
+      - key: "dmicode"
+        command: "dmidecode -t 17"
+        isactive: true
+        parser: "local"
+      - key: "is-opta"
+        command: "cat /etc/app-release"
+        isactive: true
+        parser: "local"
