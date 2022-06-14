@@ -1,0 +1,493 @@
+#! /usr/bin/python
+# Copyright 2012 Cumulus Networks LLC, all rights reserved
+# Copyright (C) 2019 Cumulus Networks, Inc. All rights reserved
+
+#############################################################################
+#
+# This is the main script that handles eeprom encoding and decoding
+#
+try:
+    import binascii
+    import json
+    import optparse
+    import warnings
+    import os
+    import subprocess
+    import sys
+    import imp
+    import glob
+except ImportError as e:
+    raise ImportError(str(e) + "- required module not found")
+
+
+platform_detect = '/usr/bin/platform-detect'
+platform_root = '/usr/share/cumulus-platform'
+cache_root = '/run/cumulus/decode-syseeprom'
+
+
+def main():
+    #
+    # determine the platform
+    #
+    try:
+        ph = subprocess.Popen((platform_detect), stdout=subprocess.PIPE,
+                              shell=False, stderr=subprocess.STDOUT)
+        cmdout = ph.communicate()[0]
+        ph.wait()
+    except OSError:
+        raise OSError("cannot detect platform")
+
+    [platform, model] = cmdout.rstrip('\n').split(',')
+    platform_path = '/'.join([platform_root, platform, model])
+
+    #
+    # load the target class file and instantiate the object
+    #
+    m = None
+    try:
+        m = imp.load_source('eeprom', '/'.join([platform_path, 'bin/eeprom.py']))
+    except IOError:
+        raise IOError("cannot load module: " + '/'.join([platform_path, 'bin/eeprom.py']))
+
+    #
+    # discover the eeproms and the paths
+    # dictionary format: [target: class, content path, status path, read-only]
+    #
+    dict = discover_eeprom(m)
+    if dict is None:
+        sys.stderr.write("decode-syseeprom: Unable to query EEPROMS\n")
+        sys.exit(0)
+
+    (opts, args) = get_cmdline_opts(dict, 'board')
+    if opts.target not in dict.keys() and opts.target != 'all':
+        errstr = "unknown target, should be one of %s" \
+                 % (', '.join(C for C in reversed(dict.keys())))
+        raise RuntimeError(errstr)
+
+    if opts.target == 'all':
+        for targ in dict.keys():
+            if targ == 'cpu':
+                continue
+            show_eeprom(targ, dict, m, opts, args)
+    else:
+        show_eeprom(opts.target, dict, m, opts, args)
+
+
+# -------------------------------------------------------------------------------
+#
+# setup to run for a specifc eeprom
+#
+def show_eeprom(name, dict, source, opts, args):
+    class_ = getattr(source, dict[name][0], None)
+    if class_ is None:
+        return 0
+    t = class_(name, dict[name][1], dict[name][2], dict[name][3])
+    # execute the command
+    run(t, name, opts, args)
+    return 0
+
+# -------------------------------------------------------------------------------
+#
+# discover eeprom paths etc.
+#
+def discover_eeprom(m):
+    # We have multiple methods for discovering eeproms.
+    #
+    # In ACPI we walk the ACPI 'bus' looking for an eeprom with "ONIE EEPROM"
+    # as the description.
+    #
+    # For MTD devices, we locate an eeprom partition in /proc/mtd
+    #
+    # On systems with "platform" kernel drivers /sys/class/eeprom_dev will
+    # contain a label for each eeprom.
+    #
+    # Finally, we have some device information in sysfs that likes to be
+    # represented as an eeprom.
+    #
+    # We attempt to discover eeproms from all sources.  The order only matters
+    # if an eeprom is discoverable via more than one method.
+    eeprom = discover_eeprom_acpi()
+    eeprom.update(discover_eeprom_mtd())
+    eeprom.update(discover_eeprom_class())
+    eeprom.update(discover_sysfs_devices(m))
+    eeprom.update(discover_eeprom_mlx(m))
+    
+    if not eeprom:
+        eeprom.update(discover_eeprom_fake())
+    return eeprom
+
+def discover_eeprom_fake():
+    return { 'board' : ('board', "fake_path", None, False) }
+
+def discover_sysfs_devices(m):
+    # Go look for eeprom_sysfs_map dictionary in platform specific eeprom.py
+    # Elements in the dictonary must be in the following format:
+    # Format: {'name' : ['class_name', 'sysfs_path'], }
+    # E.g.  : {'psu1' : ['psu', '/sys/devices/platform/vendor_driver/'], }
+
+    devices = {}
+    if hasattr(m, 'eeprom_sysfs_map'):
+        s_dict = getattr(m, 'eeprom_sysfs_map')
+
+        for name, s_list in s_dict.iteritems():
+            devices[name] = (s_list[0], s_list[1], '', True)
+
+    return devices
+
+def discover_eeprom_acpi():
+    acpi_dir = '/sys/bus/acpi/devices'
+
+    if not os.path.isdir(acpi_dir):
+        return {}
+
+    eeprom_path = None
+    for root, dirs, files in os.walk(acpi_dir):
+        for device in dirs:
+            desc_fn = os.path.join(acpi_dir, device, 'description')
+            if os.path.exists(desc_fn):
+                description = open(desc_fn, 'r').read().strip()
+                if description == 'ONIE EEPROM':
+                    eeprom_path = os.path.join(acpi_dir, device, 'physical_node', 'eeprom')
+                    break
+
+    if eeprom_path:
+        # class, path, cpld, read-only, format
+        return { 'board' : ('board', eeprom_path, None, False, 'onie') }
+
+    return {}
+
+def discover_eeprom_class():
+    eeprom_dev = '/sys/class/eeprom_dev'
+    cpld_path = ''
+
+    # eeprom_dev doesn't exist, no kernel support or module not loaded
+    if not os.path.isdir(eeprom_dev):
+        return {}
+
+    eeprom = {}
+    eeprom_dirs = os.listdir(eeprom_dev)
+    for eeprom_dir in eeprom_dirs:
+        label_path = os.path.join(eeprom_dev, eeprom_dir, 'label')
+        if not os.path.isfile(label_path):
+            continue
+
+        label = open(label_path, 'r').read().strip()
+
+        for e_type in ['psu', 'fan', 'board', 'cpu']:
+            if label.startswith(e_type):
+                eeprom_path = os.path.join(eeprom_dev, eeprom_dir, 'device', 'eeprom')
+                eeprom_key = label.split('_')[0]
+                eeprom_class = ''.join([x for x in eeprom_key if not x.isdigit()])
+                read_only = not os.access(eeprom_path, os.W_OK)
+                eeprom[eeprom_key] = (eeprom_class, eeprom_path, cpld_path, read_only)
+                break
+
+    return eeprom
+
+def discover_eeprom_mtd():
+    mtd_root = '/dev'
+    mtd_info = '/proc/mtd'
+    cpld_path = ''
+
+    try:
+        ph = subprocess.Popen(['/bin/grep', '-i', 'eeprom', mtd_info],
+                              stdout=subprocess.PIPE,
+                              shell=False, stderr=subprocess.STDOUT)
+        cmdout = ph.communicate()[0]
+        ph.wait()
+    except OSError:
+        return {}
+
+    if len(cmdout) == 0 or (not os.path.exists(mtd_info)):
+        return {}
+
+    eeprom = {}
+    lines = cmdout.splitlines()
+    for I in lines:
+        I = I.rstrip(':\n\r')
+        (partition_node, mtd_size, erasesize, label_node)= I.split(' ')
+        partition = partition_node.split(":")[0]
+        label = label_node[1:-1]
+
+    for e_type in ['board']:
+        if label.startswith(e_type):
+            eeprom_path = os.path.join(mtd_root, partition)
+            eeprom_key = label.split('_')[0]
+            eeprom_class = ''.join([x for x in eeprom_key if not x.isdigit()])
+            read_only = not os.access(eeprom_path, os.W_OK)
+            eeprom[eeprom_key] = (eeprom_class, eeprom_path, cpld_path, read_only)
+            break
+
+    return eeprom
+
+#
+# We switched to use Mellanox hw-management package to manage platform
+# devices. The hw-management package creates symbolic links to various
+# devices under /run/hw-management/* with well defined names on all
+# mellanox platforms.
+#
+def discover_eeprom_mlx(m):
+    eeprom_dir = '/run/hw-management/eeprom'
+    myeeprom_map = {'cpu_info': 'cpu',
+                    'vpd_info': 'board',
+                    'psu1_info': 'psu1',
+                    'psu2_info': 'psu2',
+                    'fan1_info': 'fan1',
+                    'fan2_info': 'fan2',
+                    'fan3_info': 'fan3',
+                    'fan4_info': 'fan4'
+                    }
+
+    if not os.path.isdir(eeprom_dir):
+        return {}
+
+    eeprom = {}
+    eeprom_files = os.listdir(eeprom_dir)
+    for eeprom_names in eeprom_files:
+        mypath = os.path.join(eeprom_dir, eeprom_names)
+	if eeprom_names in myeeprom_map.keys():
+            eepromkey = myeeprom_map.get(eeprom_names)
+            eepromclass = ''.join([x for x in eepromkey if not x.isdigit()])
+            readonly = not os.access(mypath, os.W_OK)
+            eeprom[eepromkey] = (eepromclass, mypath, '', readonly)
+
+    return eeprom
+
+# -------------------------------------------------------------------------------
+#
+# sets global variable "optcfg"
+#
+def get_cmdline_opts(dict, default_dev):
+    target_str = ("select the target eeprom (" +
+                  ', '.join(C for C in reversed(dict.keys())) +
+                  ") for read or write operation, or select 'all' for read operation, default is '" +
+                  default_dev + "'")
+    optcfg = optparse.OptionParser(usage="usage: %s [-a][-r][-s [args]][-t <target>][-e][-m]" % sys.argv[0])
+    optcfg.add_option("-a", dest="startmac", action="store_true", default=False,
+                      help="print the base mac address for switch interfaces")
+    optcfg.add_option("-r", dest="macrange", action="store_true", default=False,
+                      help="print the number of macs allocated for switch interfaces")
+    optcfg.add_option("-s", dest="set", action="store_true", default=False,
+                      help="set the eeprom content if the eeprom is writable. args "
+                           "can be supplied in command line in a comma separated "
+                           "list of the form '<field>=<value>, ...'.  ',' and '=' "
+                           "are illegal characters in field names and values. Fields "
+                           "that are not specified will default to their current "
+                           "values.  If args are supplied in command line, they will "
+                           "be written without confirmation.  If args is empty, the "
+                           "values will be prompted interactively.")
+    optcfg.add_option("-j", "--json", action="store_true", default=False,
+                      help="Display JSON output")
+    optcfg.add_option("-t", dest="target", action="store", type="string",
+                      default=default_dev, help=target_str)
+    optcfg.add_option("-e", "--serial", dest="serial", action="store_true",
+                      default=False, help="print device serial number")
+    optcfg.add_option("-m", dest="mgmtmac", action="store_true", default=False,
+                      help="print the base mac address for management interfaces")
+    optcfg.add_option("--init", dest="init", action="store_true", default=False,
+                      help="clear and initialize board eeprom cache")
+    return optcfg.parse_args()
+
+# -------------------------------------------------------------------------------
+#
+# Run
+#
+
+
+def run(targetHide, name, opts, args):
+    class FakeEEPROM(object):
+        def check_status(self, *args):
+            return 'ok'
+        def read_eeprom(self, *args):
+            return {}
+        def update_cache():
+            return 
+        def decode_eeprom(self, *args):
+            return {}
+        def switchaddrrange(self, *args):
+            return 1
+        def decode_eeprom_dictionary(self, *args):
+            mac = self.switchaddrstr(args)
+            return {
+                "idString": "TlvInfo",
+                "totalLength": 69,
+                "validTlvInfoHeader": "true",
+                "version": 1,
+                "tlv": {
+                    "Base MAC Address": {
+                        "code": "0x24",
+                        "index": 47,
+                        "length": 6,
+                        "value": mac
+                        },
+                    "CRC-32": {
+                        "code": "0xFE",
+                        "index": 74,
+                        "length": 4,
+                        "value": "0xBC1F0CA0"
+                    },
+                    "Device Version": {
+                        "code": "0x26",
+                        "index": 33,
+                        "length": 1,
+                        "value": "3"
+                    },
+                    "MAC Addresses": {
+                        "code": "0x2A",
+                        "index": 43,
+                        "length": 2,
+                        "value": "1"
+                    },
+                    "Part Number": {
+                        "code": "0x22",
+                        "index": 36,
+                        "length": 5,
+                        "value": "5.1.0"
+                    },
+                    "Product Name": {
+                        "code": "0x21",
+                        "index": 29,
+                        "length": 2,
+                        "value": "Containerised VX"
+                    },
+                    "Serial Number": {
+                        "code": "0x23",
+                        "index": 55,
+                        "length": 17,
+                        "value": mac
+                    },
+                    "Vendor Name": {
+                        "code": "0x2D",
+                        "index": 11,
+                        "length": 16,
+                        "value": "Cumulus Networks"
+                    }
+
+                    }
+                }
+        def serial_number_str(self, *args):
+            return self.switchaddrstr(args)
+        def mgmtaddrstr(self, *args):
+            return self.switchaddrstr(args)
+        def switchaddrstr(self, *args):
+            from uuid import getnode as get_mac
+            mac = get_mac()
+            return ':'.join(("%012X" % mac)[i:i+2] for i in range(0, 12, 2))
+        def is_checksum_valid(self, *args):
+            return (True, 'FakeCRC')
+    
+    target = FakeEEPROM()
+
+    status = target.check_status()
+    if status != 'ok':
+        sys.stderr.write("Device is not ready: " + status + "\n")
+        return 0
+
+    if not os.path.exists(cache_root):
+        try:
+            os.makedirs(cache_root)
+        except:
+            pass
+    if opts.init:
+        for file in glob.glob(os.path.join(cache_root, '*')):
+            os.remove(file)
+
+    #
+    # only the eeprom classes that inherit from eeprom_base
+    # support caching. Others will work normally
+    #
+    try:
+        target.set_cache_name(os.path.join(cache_root, name))
+    except:
+        pass
+
+    e = target.read_eeprom()
+    if e is None:
+        return 0
+
+    try:
+        target.update_cache(e)
+    except:
+        pass
+
+    if opts.init:
+        return 0
+
+    if opts.startmac:
+        sa = target.switchaddrstr(e)
+        if sa is not None:
+            print sa
+    elif opts.mgmtmac:
+        mm = target.mgmtaddrstr(e)
+        if mm is not None:
+            print mm
+    elif opts.macrange:
+        sr = target.switchaddrrange(e)
+        if sr is not None:
+            print sr
+    elif opts.serial:
+        try:
+            serial = target.serial_number_str(e)
+            serial = serial.rstrip(' \t\r\n\0') 
+        except NotImplemented as e:
+            print e
+        else:
+            print serial or "Undefined."
+    elif opts.set:
+        # To modify EEPROM you need root access
+        if not os.geteuid() == 0:
+            raise RuntimeError("must be root to run")
+
+        if target.is_read_only():
+            sys.stderr.write("Device eeprom cannot be modified\n")
+            exit(0)
+
+        new_e = target.set_eeprom(e, args)
+        yn = 'y'
+        if len(args) == 0:
+            print "\nPlease review eeprom content:\n"
+            target.decode_eeprom(new_e)
+            yn = raw_input("\nSave eeprom content? <y/n> ")
+
+        if yn in ['y', 'Y']:
+            target.write_eeprom(new_e)
+
+    elif opts.json:
+        data = target.decode_eeprom_dictionary(e)
+        print json.dumps(data, sort_keys=True, indent=4, encoding="iso8859_15")
+
+    else:
+        target.decode_eeprom(e)
+        (is_valid, valid_crc) = target.is_checksum_valid(e)
+        if is_valid is None:
+            return 0
+        if is_valid:
+            print '(checksum valid)'
+        else:
+            print '(*** checksum invalid)'
+            # + ', should be 0x' + binascii.b2a_hex(array('I', [valid_crc])).upper() + ')'
+            return 0
+    return 0
+
+
+#
+# formats warnings
+#
+def mywarn(message, category, filename, lineno, line=None):
+    return '%s:%s : %s : %s\n' % (filename, lineno, category.__name__, message)
+
+# --------------------
+#
+# execution check
+#
+if __name__ == "__main__":
+    try:
+        warnings.simplefilter("always")
+        warnings.formatwarning = mywarn
+        exit(main())
+    except KeyboardInterrupt:
+        sys.stderr.write("\nInterrupted\n")
+        exit(1)
+    except (RuntimeError, OSError, IOError) as errstr:
+        sys.stderr.write("%s : ERROR : %s\n" % (sys.argv[0], str(errstr)))
+        exit(1)

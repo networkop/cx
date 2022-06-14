@@ -5,14 +5,14 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux gnupg
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux gnupg ca-certificates
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
 # or apt list --installed  2>/dev/null | tail -n +2 | awk -F '/| ' '{print $1"="$3}' | grep cl > packages
-COPY 5.0/packages packages
-COPY 5.0/sources.list /etc/apt/sources.list
-COPY 5.0/trusted.gpg /etc/apt/trusted.gpg
+COPY 5.1/packages packages
+COPY 5.1/sources.list /etc/apt/sources.list
+COPY 5.1/trusted.gpg /etc/apt/trusted.gpg
 
 # This is for NTP package
 RUN mkdir -p /usr/lib/systemd/system-preset/
@@ -82,7 +82,7 @@ RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/pytho
 RUN touch /etc/cumulus/ports.conf
 
 # Stubbing out any calls to eeprom decoders to return spoofed data instead
-COPY hacks/decode-syseeprom.5.0 /usr/cumulus/bin/decode-syseeprom
+COPY hacks/decode-syseeprom.5.1 /usr/cumulus/bin/decode-syseeprom
 
 # Disabling switchd ffs
 RUN cp /lib/systemd/system/switchd.service /lib/systemd/system/switchd.service.bkp && \
@@ -133,26 +133,5 @@ RUN rm /etc/systemd/system/multi-user.target.wants/smond.service
 # Install PCAP-capable hsflowd
 COPY hacks/hsflowd_2.0.36-2_amd64.deb /tmp 
 RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
-
-# netq-agent (prepare)
-COPY 5.0/netq/netq.list /etc/apt/sources.list.d/netq.list
-COPY 5.0/netq/netq.key /tmp/netq.key
-#COPY 5.0/netq/os-release /etc/os-release
-
-RUN apt-key add /tmp/netq.key
-
-# netq-agent (install)
-RUN apt update && apt install netq-agent -y
-
-# Reduce the net-dev polling interval to 2 seconds
-COPY 5.0/netq/cl4-netq-commands.yml /etc/netq/commands/cl4-netq-commands.yml
-RUN sed -i 's/_MIN_PERIOD = 15/_MIN_PERIOD = 2/' /usr/share/venvs/netq-agent/lib/python3.7/site-packages/netq_agent/cmd/agent.py
-
-# netq-agent (configure)
-COPY 5.0/netq/netq.yml /etc/netq/netq.yml
-RUN sed -i 's/swp/veth/' /usr/share/venvs/netq-agent/lib/python3.7/site-packages/netq_lib/common/enums.py
-
-# Ensure netqd always starts
-RUN ln -s /lib/systemd/system/netq-agent.service /etc/systemd/system/multi-user.target.wants/netq-agent.service
 
 ENTRYPOINT ["/sbin/init"]

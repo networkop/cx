@@ -53,7 +53,7 @@ netq-commands:
         command: None
         isactive: true
         parser: "local"
-      - period: "7"
+      - period: "2"
         key: "proc-net-dev"
         isactive: true
         command: None
