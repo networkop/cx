@@ -1,6 +1,6 @@
 # Cumulus Linux package repository
-deb      http://apt.cumulusnetworks.com/repo CumulusLinux-5-latest cumulus upstream netq
-deb-src  http://apt.cumulusnetworks.com/repo CumulusLinux-5-latest cumulus upstream netq
+deb      http://apt.cumulusnetworks.com/repo CumulusLinux-5.0.1 cumulus upstream netq
+deb-src  http://apt.cumulusnetworks.com/repo CumulusLinux-5.0.1 cumulus upstream netq
 
 # NetQ package repository
 #
