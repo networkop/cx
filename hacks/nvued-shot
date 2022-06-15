@@ -1,0 +1,12 @@
+[Unit]
+Description=nvued workaround
+Before=nvued.service
+
+[Service]
+Type=oneshot
+ExecStartPre=rm -rf /etc/resolv.conf
+ExecStart=touch /etc/resolv.conf
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
