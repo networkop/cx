@@ -1,0 +1,11 @@
+[Unit]
+Description=system_mac workaround
+After=ptmd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/cumulus/gen_sys_mac.py
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
