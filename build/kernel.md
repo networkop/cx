@@ -5,7 +5,7 @@ qemu-img convert -f qcow2 -O raw cumulus-linux-5.0.0-vx-amd64-qemu.qcow2 cumulus
 ```
 
 ```
-fdisk -l cumulus.raw                                                                                                                            
+fdisk -l cumulus.raw
 Disk cumulus.raw: 6 GiB, 6442450944 bytes, 12582912 sectors
 Units: sectors of 1 * 512 = 512 bytes
 Sector size (logical/physical): 512 bytes / 512 bytes
@@ -23,7 +23,7 @@ cumulus.raw4 530432 12582878 12052447  5.8G Linux filesystem
 ```
 sudo losetup -f -P cumulus.raw
 
-ls -1 /dev/loop0*                                                                                                                               
+ls -1 /dev/loop0*
 /dev/loop0
 /dev/loop0p1
 /dev/loop0p2
@@ -48,4 +48,11 @@ cp -au /mnt/cx/lib/modules lib
 
 ```
 docker build -t networkop/cl-kernel:5.0.0 .
+```
+
+## Cleanup
+
+```
+sudo umount /mnt/cx
+sudo losetup -d /dev/loop0
 ```
