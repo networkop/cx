@@ -4,7 +4,7 @@ deb-src  https://apt.cumulusnetworks.com/repo CumulusLinux-5-latest cumulus upst
 
 # NetQ package repository
 #
-#deb  https://apps3.cumulusnetworks.com/repos/deb/ CumulusLinux-5 netq-latest
+#deb  https://apps3.cumulusnetworks.com/repos/deb/ CumulusLinux-5.1.0 netq-latest
 
 # Debian 10 Buster main package repositories
 # Uncomment these if you want to install upstream Debian packages

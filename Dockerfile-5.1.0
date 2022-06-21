@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux gnupg ca-certificates
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux ca-certificates gnupg 
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -35,6 +35,7 @@ RUN  sed -i '/cumulus-docker-setup/d' packages && \
     sed -i '/openvswitch-common/d' packages && \
     sed -i '/python-openvswitch/d' packages && \
     sed -i '/python3-nvue/d' packages && \
+    sed -i '/linux-image/d' packages && \
     sed -i '/openvswitch-vtep/d' packages
 
 # Install everything else
@@ -133,5 +134,15 @@ RUN rm /etc/systemd/system/multi-user.target.wants/smond.service
 # Install PCAP-capable hsflowd
 COPY hacks/hsflowd_2.0.36-2_amd64.deb /tmp 
 RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
+
+# nvued workaround
+COPY hacks/nvued-shot /etc/systemd/system/nvued-shot.service 
+RUN  ln -s  /etc/systemd/system/nvued-shot.service /etc/systemd/system/multi-user.target.wants/nvued-shot.service
+
+# sysmac workaround
+COPY hacks/gen_sys_mac.py /usr/lib/cumulus/gen_sys_mac.py
+COPY hacks/sys-mac-shot /etc/systemd/system/sys-mac-shot.service 
+RUN  ln -s  /etc/systemd/system/sys-mac-shot.service /etc/systemd/system/multi-user.target.wants/sys-mac-shot.service
+
 
 ENTRYPOINT ["/sbin/init"]
