@@ -5,7 +5,7 @@ ENV LC_ALL C
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install systemd :)
-RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux ca-certificates gnupg 
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux gnupg ca-certificates  
 
 # Copy Cumulus repos and a list of packages
 # NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
@@ -35,11 +35,17 @@ RUN  sed -i '/cumulus-docker-setup/d' packages && \
     sed -i '/openvswitch-common/d' packages && \
     sed -i '/python-openvswitch/d' packages && \
     sed -i '/python3-nvue/d' packages && \
+    sed -i '/watchdog/d' packages && \
+    sed -i '/cumulus-archive-keyring/d' packages && \
     sed -i '/linux-image/d' packages && \
     sed -i '/openvswitch-vtep/d' packages
 
 # Install everything else
 RUN apt install --allow-downgrades -y $(cat packages)
+
+# Workaround for watchdog
+RUN apt install -y watchdog || sed -i '/systemctl/d' /var/lib/dpkg/info/watchdog.postinst && \
+    apt install -y watchdog 
 
 # Workaround for nvue
 RUN ln -s /usr/bin/env /bin/env
