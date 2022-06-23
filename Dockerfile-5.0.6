@@ -84,7 +84,7 @@ RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/pytho
 RUN touch /etc/cumulus/ports.conf
 
 # Stubbing out any calls to eeprom decoders to return spoofed data instead
-COPY hacks/decode-syseeprom.5.0 /usr/cumulus/bin/decode-syseeprom
+COPY hacks/decode-syseeprom.5.2 /usr/cumulus/bin/decode-syseeprom
 
 # Disabling switchd ffs
 RUN cp /lib/systemd/system/switchd.service /lib/systemd/system/switchd.service.bkp && \
@@ -140,9 +140,6 @@ RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
 COPY hacks/nvued-shot /etc/systemd/system/nvued-shot.service 
 RUN  ln -s  /etc/systemd/system/nvued-shot.service /etc/systemd/system/multi-user.target.wants/nvued-shot.service
 
-# sysmac workaround
-COPY hacks/gen_sys_mac.py /usr/lib/cumulus/gen_sys_mac.py
-COPY hacks/sys-mac-shot /etc/systemd/system/sys-mac-shot.service 
-RUN  ln -s  /etc/systemd/system/sys-mac-shot.service /etc/systemd/system/multi-user.target.wants/sys-mac-shot.service
+
 
 ENTRYPOINT ["/sbin/init"]
