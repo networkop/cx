@@ -1,0 +1,150 @@
+FROM debian:buster
+
+ENV container docker
+ENV LC_ALL C
+ENV DEBIAN_FRONTEND noninteractive
+
+# Install systemd :)
+RUN apt update && apt install -y vim systemd udev pciutils sudo tcpdump less util-linux gnupg ca-certificates  
+
+# Copy Cumulus repos and a list of packages
+# NOTE: apt list --installed 2>/dev/null | tail -n +2 | cut -d '/' -f1 > packages
+# or apt list --installed  2>/dev/null | tail -n +2 | awk -F '/| ' '{print $1"="$3}' | grep cl > packages
+COPY 5.3/packages packages
+COPY 5.3/sources.list /etc/apt/sources.list
+COPY 5.3/trusted.gpg /etc/apt/trusted.gpg
+
+# This is for NTP package
+RUN mkdir -p /usr/lib/systemd/system-preset/
+
+RUN apt update
+
+# Delete unwanted packages 
+RUN  sed -i '/cumulus-docker-setup/d' packages && \
+    sed -i '/docker-ce/d' packages && \
+    sed -i '/docker-ce-cli/d' packages && \
+    sed -i '/what-just-happened/d' packages && \
+    sed -i '/containerd.io/d' packages && \
+    sed -i '/onie-tools/d' packages && \
+    sed -i '/grub-common/d' packages && \
+    sed -i '/grub2-common/d' packages && \
+    sed -i '/grub-pc/d' packages && \
+    sed -i '/grub-pc-bin/d' packages && \
+    sed -i '/netq-agent/d' packages && \
+    sed -i '/netq-apps/d' packages && \
+    sed -i '/openvswitch-common/d' packages && \
+    sed -i '/python-openvswitch/d' packages && \
+    sed -i '/python3-nvue/d' packages && \
+    sed -i '/watchdog/d' packages && \
+    sed -i '/cumulus-archive-keyring/d' packages && \
+    sed -i '/linux-image/d' packages && \
+    sed -i '/libyang/d' packages && \
+    sed -i '/openvswitch-vtep/d' packages
+
+# Install everything else
+RUN apt install --allow-downgrades -y $(cat packages)
+
+# Workaround for watchdog
+RUN apt install -y watchdog || sed -i '/systemctl/d' /var/lib/dpkg/info/watchdog.postinst && \
+    apt install -y watchdog 
+
+# Workaround for nvue
+RUN ln -s /usr/bin/env /bin/env
+RUN apt install -y python3-nvue || sed -i '/systemctl restart/d' /var/lib/dpkg/info/python3-nvue.postinst && \
+    apt install -y python3-nvue && \
+    sed -i 's/KEY=.*/KEY=nvue/' /usr/lib/nvue/nvued-pre.sh
+
+RUN echo ". /etc/profile" >> /root/.bashrc
+
+## HACKS (to make various services work)
+
+# Disable ZTP
+RUN rm /etc/systemd/system/multi-user.target.wants/ztp.service
+
+# We'll pretend we're cumulus vx (needed to start netd)
+RUN echo "echo -n 'x86-cumulus_vx-docker'" > /bin/onie-sysinfo
+RUN chmod +x /bin/onie-sysinfo
+
+# MSTPd workaround
+COPY hacks/mstpd-shot /etc/systemd/system/mstpd-shot.service 
+RUN  ln -s  /etc/systemd/system/mstpd-shot.service /etc/systemd/system/multi-user.target.wants/mstpd-shot.service
+
+
+# Disabling aclinit due to 'iptables --class' non-existing
+RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/aclinit.service
+RUN sed -i 's/ExecStart=.*/ExecStart=true/' /lib/systemd/system/acltool.service
+RUN mkdir -p /etc/cumulus/acl/policy.d/ && \
+    rm -rf /etc/cumulus/acl/policy.d/* && \
+    touch /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules 
+# This is just to have one rule otherwise net delete all fails
+RUN echo "[ebtables]" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules && \
+    echo "-A INPUT -p ipv4 --in-interface swp+ -j ACCEPT" >> /etc/cumulus/acl/policy.d/99control_plane_catch_all.rules
+
+# Stubbing out ledmgrd to avoid polluting logs
+RUN sed -i 's/ExecStart=.*/ExecStart=tail -f \/dev\/null/' /lib/systemd/system/ledmgrd.service
+
+# Hardcoding platform to cumulux_vx
+RUN sed -i 's/forced_platform=None/forced_platform="cumulus_vx"/' /usr/lib/python2.7/dist-packages/cumulus/platforms/__init__.py
+
+# this is needed to get `net show configuration commands` working
+RUN touch /etc/cumulus/ports.conf
+
+# Stubbing out any calls to eeprom decoders to return spoofed data instead
+COPY hacks/decode-syseeprom.5.1 /usr/cumulus/bin/decode-syseeprom
+
+# Disabling switchd ffs
+RUN cp /lib/systemd/system/switchd.service /lib/systemd/system/switchd.service.bkp && \
+    sed -i 's/ExecStart=.*/ExecStart=tail -f \/dev\/null/' /lib/systemd/system/switchd.service && \
+    sed -i 's/Type=notify/Type=simple/' /lib/systemd/system/switchd.service && \
+    sed -i '/ExecReload=.*/d' /lib/systemd/system/switchd.service && \
+    sed -i '/ExecStopPost=.*/d' /lib/systemd/system/switchd.service && \
+    sed -i '/ExecStopPost=.*/d' /lib/systemd/system/switchd.service && \
+    sed -i '/WatchdogSec=.*/d' /lib/systemd/system/switchd.service
+
+# Enabling root login (for my SSH debugging purposes)
+RUN echo "root:root" | chpasswd && \
+    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+# Adding cumulus user
+RUN useradd -ms /bin/bash cumulus && \
+    echo "cumulus:cumulus" | chpasswd
+
+# Enabling remote API access by default
+RUN ln -s /etc/nginx/sites-available/nvue.conf /etc/nginx/sites-enabled/nvue.conf && \
+    sed -i 's/listen localhost:8765 ssl;/listen \[::\]:8765 ipv6only=off ssl;/g' /etc/nginx/sites-available/nvue.conf
+
+# Enable vrf mgmt by default
+COPY hacks/interfaces /etc/network/interfaces
+
+# Copy sysctl settings
+COPY hacks/sysctl.d/ /etc/sysctl.d/
+COPY hacks/systemd-sysctl.service /lib/systemd/system/systemd-sysctl.service
+
+# Pre-create resolve.conf and stop dhclient from trying to change it
+RUN echo -n "nameserver 8.8.8.8 # vrf mgmt" > /etc/resolv.conf && \
+    echo 'make_resolv_conf() { :; }' > /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone && \
+    chmod 755 /etc/dhcp/dhclient-enter-hooks.d/leave_my_resolv_conf_alone
+
+# Reduce dhclient timeout to avoid long startups 
+RUN sed -i 's/#timeout 60;/timeout 2;/' /etc/dhcp/dhclient.conf
+
+# Hack hard-coded file paths
+RUN ln -s /sbin/ifreload /usr/sbin/ifreload && \
+    ln -s /bin/lsblk /usr/bin/lsblk
+
+# Ensure FRR always starts
+RUN ln -s /lib/systemd/system/frr.service /etc/systemd/system/multi-user.target.wants/frr.service
+
+# Disable smond
+RUN rm /etc/systemd/system/multi-user.target.wants/smond.service
+
+# Install PCAP-capable hsflowd
+COPY hacks/hsflowd_2.0.36-2_amd64.deb /tmp 
+RUN apt install -y /tmp/hsflowd_2.0.36-2_amd64.deb
+
+# sysmac workaround
+# COPY hacks/gen_sys_mac.py /usr/lib/cumulus/gen_sys_mac.py
+# COPY hacks/sys-mac-shot /etc/systemd/system/sys-mac-shot.service 
+# RUN  ln -s  /etc/systemd/system/sys-mac-shot.service /etc/systemd/system/multi-user.target.wants/sys-mac-shot.service
+
+ENTRYPOINT ["/sbin/init"]
