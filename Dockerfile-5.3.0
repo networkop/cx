@@ -109,6 +109,9 @@ RUN echo "root:root" | chpasswd && \
 RUN useradd -ms /bin/bash cumulus && \
     echo "cumulus:cumulus" | chpasswd
 
+# Add cumulus user to the sudo group
+RUN sudo usermod -aG sudo cumulus
+
 # Enabling remote API access by default
 RUN ln -s /etc/nginx/sites-available/nvue.conf /etc/nginx/sites-enabled/nvue.conf && \
     sed -i 's/listen localhost:8765 ssl;/listen \[::\]:8765 ipv6only=off ssl;/g' /etc/nginx/sites-available/nvue.conf
